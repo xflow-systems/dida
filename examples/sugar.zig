@@ -1,7 +1,7 @@
 // TODO this is just a proof of concept, api might change a lot
 
 const std = @import("std");
-const dida = @import("lib/dida.zig");
+const dida = @import("dida");
 
 var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 const allocator = arena.allocator();

@@ -5,8 +5,6 @@ const dida = @import("../dida.zig");
 
 pub const warn = std.debug.warn;
 pub const debug_assert = std.debug.assert;
-pub const max = std.math.max;
-pub const min = std.math.min;
 pub const Allocator = std.mem.Allocator;
 pub const ArenaAllocator = std.heap.ArenaAllocator;
 pub const ArrayList = std.ArrayList;
@@ -16,10 +14,10 @@ pub const AutoHashMap = std.AutoHashMap;
 pub fn panic(comptime message: []const u8, args: anytype) noreturn {
     // TODO should we preallocate memory for panics?
     var buf = ArrayList(u8).init(std.heap.page_allocator);
-    var writer = buf.writer();
+    const writer = buf.writer();
     std.fmt.format(writer, message, args) catch
-        std.mem.copy(u8, buf.items[buf.items.len - 3 .. buf.items.len], "OOM");
-    @panic(buf.toOwnedSlice());
+        std.mem.copyForwards(u8, buf.items[buf.items.len - 3 .. buf.items.len], "OOM");
+    @panic(buf.toOwnedSlice() catch unreachable);
 }
 
 pub fn assert(condition: bool, comptime message: []const u8, args: anytype) void {
@@ -31,7 +29,7 @@ pub fn comptimeAssert(comptime condition: bool, comptime message: []const u8, co
 }
 
 pub fn compileError(comptime message: []const u8, comptime args: anytype) void {
-    @compileError(comptime std.fmt.comptimePrint(message, args));
+    @compileError(std.fmt.comptimePrint(message, args));
 }
 
 pub fn DeepHashMap(comptime K: type, comptime V: type) type {
@@ -44,7 +42,7 @@ pub fn DeepHashSet(comptime K: type) type {
 
 pub fn format(allocator: Allocator, comptime fmt: []const u8, args: anytype) ![]const u8 {
     var buf = ArrayList(u8).init(allocator);
-    var writer = buf.writer();
+    const writer = buf.writer();
     try std.fmt.format(writer, fmt, args);
     return buf.items;
 }
@@ -99,9 +97,8 @@ pub fn TODO() noreturn {
 
 // This is only for debugging
 pub fn dump(thing: anytype) void {
-    const stderr_mutex = std.debug.getStderrMutex();
-    stderr_mutex.lock();
-    defer stderr_mutex.unlock();
+    std.debug.lockStdErr();
+    defer std.debug.unlockStdErr();
     const my_stderr = std.io.getStdErr().writer();
     dida.debug.dumpInto(my_stderr, 0, thing) catch return;
     my_stderr.writeAll("\n") catch return;
@@ -138,7 +135,7 @@ pub fn deepOrder(a: anytype, b: @TypeOf(a)) std.math.Order {
             return .eq;
         },
         .Enum => {
-            return deepOrder(@enumToInt(a), @enumToInt(b));
+            return deepOrder(@intFromEnum(a), @intFromEnum(b));
         },
         .Pointer => |pti| {
             switch (pti.size) {
@@ -179,7 +176,7 @@ pub fn deepOrder(a: anytype, b: @TypeOf(a)) std.math.Order {
             }
         },
         .Array => {
-            for (a) |a_elem, a_ix| {
+            for (a, 0..) |a_elem, a_ix| {
                 const ordering = deepOrder(a_elem, b[a_ix]);
                 if (ordering != .eq) {
                     return ordering;
@@ -198,8 +195,8 @@ pub fn deepOrder(a: anytype, b: @TypeOf(a)) std.math.Order {
         },
         .Union => |uti| {
             if (uti.tag_type) |tag_type| {
-                const a_tag = @enumToInt(@as(tag_type, a));
-                const b_tag = @enumToInt(@as(tag_type, b));
+                const a_tag = @intFromEnum(@as(tag_type, a));
+                const b_tag = @intFromEnum(@as(tag_type, b));
                 if (a_tag < b_tag) {
                     return .lt;
                 }
@@ -235,7 +232,7 @@ pub fn deepOrder(a: anytype, b: @TypeOf(a)) std.math.Order {
                 }
             }
         },
-        .ErrorSet => return deepOrder(@errorToInt(a), @errorToInt(b)),
+        .ErrorSet => return deepOrder(@intFromError(a), @intFromError(b)),
         else => compileError("Cannot deepOrder {}", .{T}),
     }
 }
@@ -258,10 +255,10 @@ pub fn deepHashInto(hasher: anytype, key: anytype) void {
         else => {},
     }
     switch (ti) {
-        .Int => @call(.{ .modifier = .always_inline }, hasher.update, .{std.mem.asBytes(&key)}),
-        .Float => |info| deepHashInto(hasher, @bitCast(std.meta.Int(.unsigned, info.bits), key)),
-        .Bool => deepHashInto(hasher, @boolToInt(key)),
-        .Enum => deepHashInto(hasher, @enumToInt(key)),
+        .Int => hasher.update(std.mem.asBytes(&key)),
+        .Float => |info| deepHashInto(hasher, @as(std.meta.Int(.unsigned, info.bits), @bitCast(key))),
+        .Bool => deepHashInto(hasher, @intFromBool(key)),
+        .Enum => deepHashInto(hasher, @intFromEnum(key)),
         .Pointer => |pti| {
             switch (pti.size) {
                 .One => deepHashInto(hasher, key.*),
@@ -289,7 +286,7 @@ pub fn deepHashInto(hasher: anytype, key: anytype) void {
                 const tag = std.meta.activeTag(key);
                 deepHashInto(hasher, tag);
                 inline for (@typeInfo(tag_type).Enum.fields) |fti| {
-                    if (@enumToInt(std.meta.activeTag(key)) == fti.value) {
+                    if (@intFromEnum(std.meta.activeTag(key)) == fti.value) {
                         deepHashInto(hasher, @field(key, fti.name));
                         return;
                     }
@@ -350,19 +347,25 @@ pub fn deepClone(thing: anytype, allocator: Allocator) error{OutOfMemory}!@TypeO
                 },
                 .Slice => {
                     const cloned = try allocator.alloc(pti.child, thing.len);
-                    for (thing) |item, i| cloned[i] = try deepClone(item, allocator);
+                    for (thing, 0..) |item, i| cloned[i] = try deepClone(item, allocator);
                     return cloned;
                 },
-                .Many, .C => compileError("Cannot deepClone {}", .{T}),
+                .Many, .C => {
+                    return thing;
+                },
             }
         },
         .Array => {
-            var cloned = thing;
+            const cloned = thing;
             for (cloned) |*item| item.* = try deepClone(item.*, allocator);
             return cloned;
         },
         .Optional => {
-            return if (thing == null) null else try deepClone(thing.?, allocator);
+            if (thing == null) {
+                return null;
+            } else {
+                return try deepClone(thing.?, allocator);
+            }
         },
         .Struct => |sti| {
             var cloned: T = thing;
@@ -373,7 +376,7 @@ pub fn deepClone(thing: anytype, allocator: Allocator) error{OutOfMemory}!@TypeO
         },
         .Union => |uti| {
             if (uti.tag_type) |tag_type| {
-                const tag = @enumToInt(std.meta.activeTag(thing));
+                const tag = @intFromEnum(std.meta.activeTag(thing));
                 inline for (@typeInfo(tag_type).Enum.fields) |fti| {
                     if (tag == fti.value) {
                         return @unionInit(T, fti.name, try deepClone(@field(thing, fti.name), allocator));

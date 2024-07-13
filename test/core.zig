@@ -1,5 +1,5 @@
 const std = @import("std");
-const dida = @import("../lib/dida.zig");
+const dida = @import("dida");
 
 //pub const allocator = std.heap.c_allocator;
 pub const allocator = std.testing.allocator;
@@ -580,7 +580,7 @@ pub fn testIndexAdd(
     }
     const actual_changess = try allocator.alloc([]dida.core.Change, index.change_batches.items.len);
     defer allocator.free(actual_changess);
-    for (actual_changess) |*changes, i| changes.* = index.change_batches.items[i].changes;
+    for (actual_changess, 0..) |*changes, i| changes.* = index.change_batches.items[i].changes;
     try expectDeepEqual(expected_changess, actual_changess);
 }
 
@@ -923,7 +923,7 @@ fn testChangeBatchSeekCurrentRowEnd(
     try std.testing.expectEqual(expected_ix, actual_ix);
 }
 
-test "test change batch seek current row end" {
+test "test change batch seek current row end 2" {
     const changes = .{
         .{ .{ "a", "x" }, .{0}, 1 },
         .{ .{ "a", "y" }, .{1}, 1 },
@@ -1516,7 +1516,7 @@ pub fn testShardTotalBalance() !void {
     var summer = dida.core.NodeSpec.ReduceSpec.Reducer{
         .reduce_fn = (struct {
             fn sum(_: *dida.core.NodeSpec.ReduceSpec.Reducer, reduced_value: dida.core.Value, row: dida.core.Row, count: usize) !dida.core.Value {
-                return dida.core.Value{ .Number = reduced_value.Number + (row.values[1].Number * @intToFloat(f64, count)) };
+                return dida.core.Value{ .Number = reduced_value.Number + (row.values[1].Number * @as(f64, @floatFromInt(count))) };
             }
         }).sum,
     };
@@ -1576,9 +1576,9 @@ pub fn testShardTotalBalance() !void {
     var account: usize = 0;
     while (account <= std.math.maxInt(u4)) : (account += 1) {
         const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @intToFloat(f64, account) },
-            .{ .Number = @intToFloat(f64, account) },
-            .{ .Number = @intToFloat(f64, 0) },
+            .{ .Number = @floatFromInt(account) },
+            .{ .Number = @floatFromInt(account) },
+            .{ .Number = @floatFromInt(0) },
         } };
         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{0} };
         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
@@ -1598,9 +1598,9 @@ pub fn testShardTotalBalance() !void {
         const amount = random.int(u8);
         const skew = random.int(u3);
         const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @intToFloat(f64, from_account) },
-            .{ .Number = @intToFloat(f64, to_account) },
-            .{ .Number = @intToFloat(f64, amount) },
+            .{ .Number = @floatFromInt(from_account) },
+            .{ .Number = @floatFromInt(to_account) },
+            .{ .Number = @floatFromInt(amount) },
         } };
         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
@@ -1616,9 +1616,9 @@ pub fn testShardTotalBalance() !void {
         const amount = random.int(u8);
         const skew = random.int(u3);
         const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @intToFloat(f64, from_account) },
-            .{ .Number = @intToFloat(f64, to_account) },
-            .{ .Number = @intToFloat(f64, amount) },
+            .{ .Number = @floatFromInt(from_account) },
+            .{ .Number = @floatFromInt(to_account) },
+            .{ .Number = @floatFromInt(amount) },
         } };
         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
@@ -1634,9 +1634,9 @@ pub fn testShardTotalBalance() !void {
         const amount = random.int(u8);
         const skew = random.int(u3);
         const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @intToFloat(f64, from_account) },
-            .{ .Number = @intToFloat(f64, to_account) },
-            .{ .Number = @intToFloat(f64, amount) },
+            .{ .Number = @floatFromInt(from_account) },
+            .{ .Number = @floatFromInt(to_account) },
+            .{ .Number = @floatFromInt(amount) },
         } };
         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });

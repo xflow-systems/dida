@@ -99,7 +99,7 @@ pub fn dumpInto(writer: anytype, indent: u32, thing: anytype) anyerror!void {
             },
             dida.core.Row => {
                 try writer.writeAll("Row[");
-                for (thing.values) |value, i| {
+                for (thing.values, 0..) |value, i| {
                     try std.fmt.format(writer, "{}", .{value});
                     if (i != thing.values.len - 1)
                         try writer.writeAll(", ");
@@ -108,7 +108,7 @@ pub fn dumpInto(writer: anytype, indent: u32, thing: anytype) anyerror!void {
             },
             dida.core.Timestamp => {
                 try writer.writeAll("T[");
-                for (thing.coords) |coord, i| {
+                for (thing.coords, 0..) |coord, i| {
                     try std.fmt.format(writer, "{}", .{coord});
                     if (i != thing.coords.len - 1)
                         try writer.writeAll(", ");
@@ -153,7 +153,7 @@ pub fn dumpInto(writer: anytype, indent: u32, thing: anytype) anyerror!void {
             dida.core.Shard => {
                 try writer.writeAll("Shard{\n");
 
-                for (thing.graph.node_specs) |node_spec, node_id| {
+                for (thing.graph.node_specs, 0..) |node_spec, node_id| {
                     try writer.writeByteNTimes(' ', indent + 4);
                     try std.fmt.format(writer, "{}: {{\n", .{node_id});
 
@@ -203,13 +203,13 @@ pub fn dumpInto(writer: anytype, indent: u32, thing: anytype) anyerror!void {
                             },
                             .Many => {
                                 // bail
-                                try std.fmt.format(writer, "{}", .{thing});
+                                try std.fmt.format(writer, "{any}", .{thing});
                             },
                             .Slice => {
                                 if (pti.child == u8) {
-                                    try std.fmt.format(writer, "\"{s}\"", .{thing});
+                                    try std.fmt.format(writer, "\"{}\"", .{thing});
                                 } else {
-                                    try std.fmt.format(writer, "[]{s}[\n", .{pti.child});
+                                    try std.fmt.format(writer, "[]{}[\n", .{pti.child});
                                     for (thing) |elem| {
                                         try writer.writeByteNTimes(' ', indent + 4);
                                         try dumpInto(writer, indent + 4, elem);
@@ -256,7 +256,7 @@ pub fn dumpInto(writer: anytype, indent: u32, thing: anytype) anyerror!void {
                             try writer.writeAll(@typeName(@TypeOf(thing)));
                             try writer.writeAll("{\n");
                             inline for (@typeInfo(tag_type).Enum.fields) |fti| {
-                                if (@enumToInt(std.meta.activeTag(thing)) == fti.value) {
+                                if (@intFromEnum(std.meta.activeTag(thing)) == fti.value) {
                                     try writer.writeByteNTimes(' ', indent + 4);
                                     try std.fmt.format(writer, ".{s} = ", .{fti.name});
                                     try dumpInto(writer, indent + 4, @field(thing, fti.name));
@@ -358,7 +358,7 @@ pub fn validateInto(state: *ValidationState, path: ValidationPath, thing: anytyp
 
     if (@sizeOf(T) != 0) {
         const key = .{
-            .address = @ptrToInt(thing),
+            .address = @intFromPtr(thing),
             .typeName = @typeName(T),
         };
         const entry = try state.pointers.getOrPut(key);
@@ -373,7 +373,7 @@ pub fn validateInto(state: *ValidationState, path: ValidationPath, thing: anytyp
     switch (@typeInfo(T)) {
         .Struct => |info| {
             if (comptime std.mem.startsWith(u8, @typeName(T), "std.array_list.ArrayList")) {
-                for (thing.items) |*elem, i| {
+                for (thing.items, 0..) |*elem, i| {
                     try validateInto(
                         state,
                         try appendPath(state.allocator, path, try u.format(state.allocator, "{}", .{i})),
@@ -410,7 +410,7 @@ pub fn validateInto(state: *ValidationState, path: ValidationPath, thing: anytyp
         .Union => |info| {
             if (info.tag_type) |tag_type| {
                 inline for (@typeInfo(tag_type).Enum.fields) |field_info| {
-                    if (@enumToInt(std.meta.activeTag(thing.*)) == field_info.value) {
+                    if (@intFromEnum(std.meta.activeTag(thing.*)) == field_info.value) {
                         // TODO putting this in the call below causes a compiler crash
                         const new_path = try appendPath(state.allocator, path, field_info.name);
                         try validateInto(
@@ -426,7 +426,7 @@ pub fn validateInto(state: *ValidationState, path: ValidationPath, thing: anytyp
             }
         },
         .Array => {
-            for (thing.*) |*elem, i| {
+            for (thing.*, 0..) |*elem, i| {
                 try validateInto(
                     state,
                     try appendPath(state.allocator, path, try u.format(state.allocator, "{}", .{i})),
@@ -445,7 +445,7 @@ pub fn validateInto(state: *ValidationState, path: ValidationPath, thing: anytyp
                 },
                 .Many => @compileError("Don't know how to validate " ++ @typeName(T)),
                 .Slice => {
-                    for (thing.*) |*elem, i| {
+                    for (thing.*, 0..) |*elem, i| {
                         try validateInto(
                             state,
                             try appendPath(state.allocator, path, try u.format(state.allocator, "{}", .{i})),

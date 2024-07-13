@@ -11,11 +11,11 @@ fn assert_ok(result: anytype) @typeInfo(@TypeOf(result)).ErrorUnion.payload {
 // TODO this needs a better name
 pub const Sugar = struct {
     allocator: u.Allocator,
-
-    const state = union(enum) {
+    
+    state: union(enum) {
         Building: dida.core.GraphBuilder,
         Running: dida.core.Shard,
-    };
+    },
 
     pub fn init(allocator: u.Allocator) Sugar {
         return .{
@@ -117,7 +117,7 @@ pub const Subgraph = struct {
     }
 };
 
-pub fn Node(comptime tag_: std.meta.TagType(dida.core.NodeSpec)) type {
+pub fn Node(comptime tag_: std.meta.Tag(dida.core.NodeSpec)) type {
     return struct {
         sugar: *Sugar,
         inner: dida.core.Node,
@@ -329,7 +329,7 @@ pub fn coerceAnonTo(allocator: u.Allocator, comptime T: type, anon: anytype) T {
             },
             dida.core.Value => {
                 switch (@typeInfo(@TypeOf(anon))) {
-                    .Int, .ComptimeInt => return .{ .Number = @intCast(u64, anon) },
+                    .Int, .ComptimeInt => return .{ .Number = @intCast(anon) },
                     .Pointer => return .{ .String = coerceAnonTo(allocator, []const u8, anon) },
                     else => u.compileError("Don't know how to coerce {} to Value", .{@TypeOf(anon)}),
                 }
@@ -368,9 +368,9 @@ const ProjectMapper = struct {
     mapper: dida.core.NodeSpec.MapSpec.Mapper,
 
     fn map(self: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
-        const project_mapper = @fieldParentPtr(ProjectMapper, "mapper", self);
-        var output_values = assert_ok(project_mapper.allocator.alloc(dida.core.Value, project_mapper.columns.len));
-        for (output_values) |*output_value, i| {
+        const project_mapper: *ProjectMapper = @fieldParentPtr("mapper", self);
+        const output_values = assert_ok(project_mapper.allocator.alloc(dida.core.Value, project_mapper.columns.len));
+        for (output_values, 0..) |*output_value, i| {
             output_value.* = input.values[project_mapper.columns[i]];
         }
         return dida.core.Row{ .values = output_values };

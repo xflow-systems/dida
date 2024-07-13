@@ -23,6 +23,15 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    
+    const check_lib = b.addStaticLibrary(.{
+        .name = "dida",
+        // In this case the main source file is merely a path, however, in more
+        // complicated build scripts, this could be a generated file.
+        .root_source_file = b.path("lib/dida.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -74,10 +83,25 @@ pub fn build(b: *std.Build) void {
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
     lib_unit_tests.root_module.addImport("dida", &lib.root_module);
+    
+    // Creates a step for unit testing. This only builds the test executable
+    // but does not run it.
+    const check_unit_tests = b.addTest(.{
+        .root_source_file = b.path("test/core.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const run_check_unit_tests = b.addRunArtifact(check_unit_tests);
+    check_unit_tests.root_module.addImport("dida", &lib.root_module);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
+
+    const check_step = b.step("check", "Run unit tests");
+    check_step.dependOn(&run_check_unit_tests.step);
+    check_step.dependOn(&check_lib.step);
 }

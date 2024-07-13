@@ -1252,12 +1252,12 @@ pub const GraphBuilder = struct {
     /// Produce the final graph.
     /// Resets `self` so it can be used again.
     pub fn finishAndReset(self: *GraphBuilder) !Graph {
-        const node_subgraphs = self.node_subgraphs.toOwnedSlice();
+        const node_subgraphs = self.node_subgraphs.toOwnedSlice() catch unreachable;
         defer self.allocator.free(node_subgraphs);
         return Graph.init(
             self.allocator,
             self.node_specs.toOwnedSlice() catch unreachable,
-            node_subgraphs catch unreachable,
+            node_subgraphs,
             self.subgraph_parents.toOwnedSlice() catch unreachable,
         );
     }
@@ -1679,7 +1679,7 @@ pub const Shard = struct {
     // IE if the existence of a change at `this` causes a change to later be produced at `that`, then we need to have `orderPointstamps(this, that) == .lt`.
     // The invariants enforced for the graph structure guarantee that this is possible.
     fn orderPointstamps(this: Pointstamp, that: Pointstamp) std.math.Order {
-        const min_len = u.min(this.subgraphs.len, that.subgraphs.len);
+        const min_len = @min(this.subgraphs.len, that.subgraphs.len);
         var i: usize = 0;
         while (i < min_len) : (i += 1) {
             // If `this` and `that` are in different subgraphs then there is no way for a change to travel from a later node to an earlier node without incrementing the timestamp coord at `i-1`.

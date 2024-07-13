@@ -97,9 +97,8 @@ pub fn TODO() noreturn {
 
 // This is only for debugging
 pub fn dump(thing: anytype) void {
-    const stderr_mutex = std.debug.getStderrMutex();
-    stderr_mutex.lock();
-    defer stderr_mutex.unlock();
+    std.debug.lockStdErr();
+    defer std.debug.unlockStdErr();
     const my_stderr = std.io.getStdErr().writer();
     dida.debug.dumpInto(my_stderr, 0, thing) catch return;
     my_stderr.writeAll("\n") catch return;
@@ -256,7 +255,7 @@ pub fn deepHashInto(hasher: anytype, key: anytype) void {
         else => {},
     }
     switch (ti) {
-        .Int => @call(.{ .modifier = .always_inline }, hasher.update, .{std.mem.asBytes(&key)}),
+        .Int => hasher.update(std.mem.asBytes(&key)),
         .Float => |info| deepHashInto(hasher, @as(std.meta.Int(.unsigned, info.bits), @bitCast(key))),
         .Bool => deepHashInto(hasher, @intFromBool(key)),
         .Enum => deepHashInto(hasher, @intFromEnum(key)),
@@ -351,7 +350,9 @@ pub fn deepClone(thing: anytype, allocator: Allocator) error{OutOfMemory}!@TypeO
                     for (thing, 0..) |item, i| cloned[i] = try deepClone(item, allocator);
                     return cloned;
                 },
-                .Many, .C => compileError("Cannot deepClone {}", .{T}),
+                .Many, .C => {
+                    return thing;
+                },
             }
         },
         .Array => {
@@ -360,7 +361,11 @@ pub fn deepClone(thing: anytype, allocator: Allocator) error{OutOfMemory}!@TypeO
             return cloned;
         },
         .Optional => {
-            return if (thing == null) null else try deepClone(thing.?, allocator);
+            if (thing == null) {
+                return null;
+            } else {
+                return try deepClone(thing.?, allocator);
+            }
         },
         .Struct => |sti| {
             var cloned: T = thing;

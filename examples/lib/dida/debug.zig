@@ -203,13 +203,13 @@ pub fn dumpInto(writer: anytype, indent: u32, thing: anytype) anyerror!void {
                             },
                             .Many => {
                                 // bail
-                                try std.fmt.format(writer, "{}", .{thing});
+                                try std.fmt.format(writer, "{any}", .{thing});
                             },
                             .Slice => {
                                 if (pti.child == u8) {
-                                    try std.fmt.format(writer, "\"{s}\"", .{thing});
+                                    try std.fmt.format(writer, "\"{}\"", .{thing});
                                 } else {
-                                    try std.fmt.format(writer, "[]{s}[\n", .{pti.child});
+                                    try std.fmt.format(writer, "[]{}[\n", .{pti.child});
                                     for (thing) |elem| {
                                         try writer.writeByteNTimes(' ', indent + 4);
                                         try dumpInto(writer, indent + 4, elem);

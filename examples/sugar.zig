@@ -41,7 +41,7 @@ pub fn main() !void {
     try edges.advance(.{2});
     try sugar.doAllWork();
     while (out.pop()) |change_batch| {
-        dida.common.dump(change_batch);
+        dida.util.dump(change_batch);
     }
 
     //dida.common.dump(sugar);

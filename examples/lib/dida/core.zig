@@ -101,7 +101,7 @@ pub const Timestamp = struct {
 
     pub fn pushCoord(self: Timestamp, allocator: u.Allocator) !Timestamp {
         var new_coords = try allocator.alloc(usize, self.coords.len + 1);
-        std.mem.copy(usize, new_coords, self.coords);
+        std.mem.copyForwards(usize, new_coords, self.coords);
         new_coords[new_coords.len - 1] = 0;
         return Timestamp{ .coords = new_coords };
     }
@@ -161,7 +161,7 @@ pub const Timestamp = struct {
         var output_coords = try allocator.alloc(usize, self.coords.len);
         for (self.coords, 0..) |self_coord, i| {
             const other_coord = other.coords[i];
-            output_coords[i] = u.max(self_coord, other_coord);
+            output_coords[i] = @max(self_coord, other_coord);
         }
         return Timestamp{ .coords = output_coords };
     }
@@ -279,10 +279,10 @@ pub const SupportedFrontier = struct {
         if (support_entry.value_ptr.* == 0) {
             // Timestamp was just removed, might have been in frontier
             if (self.support.fetchRemove(timestamp)) |*remove_entry| {
-                remove_entry.key.deinit(self.allocator);
+                @constCast(remove_entry).key.deinit(self.allocator);
             }
             if (self.frontier.timestamps.fetchRemove(timestamp)) |*remove_entry| {
-                remove_entry.key.deinit(self.allocator);
+                @constCast(remove_entry).key.deinit(self.allocator);
 
                 // Removed this timestamp from frontier
                 try changes_into.append(.{ .timestamp = try u.deepClone(timestamp, self.allocator), .diff = -1 });
@@ -297,7 +297,7 @@ pub const SupportedFrontier = struct {
                 }
 
                 // Add in lexical order any candidates that are not past the current frontier (or past any earlier candidates)
-                std.sort.sort(Timestamp, candidates.items, {}, struct {
+                std.sort.insertion(Timestamp, candidates.items, {}, struct {
                     fn lessThan(_: void, a: Timestamp, b: Timestamp) bool {
                         return a.lexicalOrder(b) == .lt;
                     }
@@ -574,7 +574,7 @@ pub const ChangeBatchBuilder = struct {
     pub fn coalesce(self: *ChangeBatchBuilder) void {
         if (self.changes.items.len == 0) return;
 
-        std.sort.sort(Change, self.changes.items, {}, struct {
+        std.sort.insertion(Change, self.changes.items, {}, struct {
             fn lessThan(_: void, a: Change, b: Change) bool {
                 return u.deepOrder(a, b) == .lt;
             }
@@ -613,7 +613,7 @@ pub const ChangeBatchBuilder = struct {
 
         return ChangeBatch{
             .lower_bound = lower_bound,
-            .changes = self.changes.toOwnedSlice(),
+            .changes = self.changes.toOwnedSlice() catch unreachable,
         };
     }
 };
@@ -768,7 +768,7 @@ pub const NodeSpec = union(NodeSpecTag) {
         mapper: *Mapper,
 
         pub const Mapper = struct {
-            map_fn: fn (self: *Mapper, row: Row) error{OutOfMemory}!Row,
+            map_fn: *const fn (self: *Mapper, row: Row) error{OutOfMemory}!Row,
         };
     };
 
@@ -813,7 +813,7 @@ pub const NodeSpec = union(NodeSpecTag) {
         reducer: *Reducer,
 
         pub const Reducer = struct {
-            reduce_fn: fn (self: *Reducer, reduced_value: Value, row: Row, count: usize) error{OutOfMemory}!Value,
+            reduce_fn: *const fn (self: *Reducer, reduced_value: Value, row: Row, count: usize) error{OutOfMemory}!Value,
         };
     };
 
@@ -1051,7 +1051,7 @@ pub const Graph = struct {
                 subgraph = subgraph_parents[subgraph.id - 1];
             }
             std.mem.reverse(Subgraph, subgraphs.items);
-            node_subgraphs[node_id] = subgraphs.toOwnedSlice();
+            node_subgraphs[node_id] = subgraphs.toOwnedSlice() catch unreachable;
         }
 
         // Collect downstream nodes
@@ -1067,7 +1067,7 @@ pub const Graph = struct {
         }
         var frozen_downstream_node_inputs = try allocator.alloc([]NodeInput, node_specs.len);
         for (downstream_node_inputs, 0..) |*node_inputs, node_id|
-            frozen_downstream_node_inputs[node_id] = node_inputs.toOwnedSlice();
+            frozen_downstream_node_inputs[node_id] = node_inputs.toOwnedSlice() catch unreachable;
 
         var self = Graph{
             .allocator = allocator,
@@ -1177,12 +1177,12 @@ pub const Graph = struct {
                 .TimestampPush => {
                     const subgraph = u.last(Subgraph, self.node_subgraphs[node_id]);
                     const entry = try latest_subgraph_pushes.getOrPutValue(subgraph, .{ .id = node_id });
-                    entry.value_ptr.id = u.max(entry.value_ptr.id, node_id);
+                    entry.value_ptr.id = @max(entry.value_ptr.id, node_id);
                 },
                 .TimestampPop => |spec| {
                     const subgraph = u.last(Subgraph, self.node_subgraphs[spec.input.id]);
                     const entry = try earliest_subgraph_pops.getOrPutValue(subgraph, .{ .id = node_id });
-                    entry.value_ptr.id = u.min(entry.value_ptr.id, node_id);
+                    entry.value_ptr.id = @min(entry.value_ptr.id, node_id);
                 },
                 else => {},
             }
@@ -1256,9 +1256,9 @@ pub const GraphBuilder = struct {
         defer self.allocator.free(node_subgraphs);
         return Graph.init(
             self.allocator,
-            self.node_specs.toOwnedSlice(),
-            node_subgraphs,
-            self.subgraph_parents.toOwnedSlice(),
+            self.node_specs.toOwnedSlice() catch unreachable,
+            node_subgraphs catch unreachable,
+            self.subgraph_parents.toOwnedSlice() catch unreachable,
         );
     }
 };
@@ -1835,7 +1835,7 @@ pub const Shard = struct {
                     }
 
                     // Sort timestamps so that when we reach each one we've already taken into account previous corrections
-                    std.sort.sort(Timestamp, timestamps_to_check.items, {}, struct {
+                    std.sort.insertion(Timestamp, timestamps_to_check.items, {}, struct {
                         fn lessThan(_: void, a: Timestamp, b: Timestamp) bool {
                             return a.lexicalOrder(b) == .lt;
                         }
@@ -1893,7 +1893,7 @@ pub const Shard = struct {
                                         .row = input_bag_entry.key_ptr.*,
                                         .count = @intCast(input_bag_entry.value_ptr.*),
                                     });
-                                std.sort.sort(RowAndCount, sorted_inputs.items, {}, (struct {
+                                std.sort.insertion(RowAndCount, sorted_inputs.items, {}, (struct {
                                     fn lessThan(_: void, a: RowAndCount, b: RowAndCount) bool {
                                         return u.deepOrder(a, b) == .lt;
                                     }

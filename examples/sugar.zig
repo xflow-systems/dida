@@ -33,7 +33,7 @@ pub fn main() !void {
     try edges.advance(.{1});
     try sugar.doAllWork();
     while (out.pop()) |change_batch| {
-        dida.common.dump(change_batch);
+        dida.util.dump(change_batch);
     }
 
     std.debug.print("Advancing!\n", .{});

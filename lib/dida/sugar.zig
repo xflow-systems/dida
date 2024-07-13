@@ -11,10 +11,11 @@ fn assert_ok(result: anytype) @typeInfo(@TypeOf(result)).ErrorUnion.payload {
 // TODO this needs a better name
 pub const Sugar = struct {
     allocator: u.Allocator,
-    state: union(enum) {
+
+    const state = union(enum) {
         Building: dida.core.GraphBuilder,
         Running: dida.core.Shard,
-    },
+    };
 
     pub fn init(allocator: u.Allocator) Sugar {
         return .{

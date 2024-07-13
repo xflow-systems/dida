@@ -11,6 +11,7 @@ fn assert_ok(result: anytype) @typeInfo(@TypeOf(result)).ErrorUnion.payload {
 // TODO this needs a better name
 pub const Sugar = struct {
     allocator: u.Allocator,
+    
     state: union(enum) {
         Building: dida.core.GraphBuilder,
         Running: dida.core.Shard,
@@ -116,7 +117,7 @@ pub const Subgraph = struct {
     }
 };
 
-pub fn Node(comptime tag_: std.meta.TagType(dida.core.NodeSpec)) type {
+pub fn Node(comptime tag_: std.meta.Tag(dida.core.NodeSpec)) type {
     return struct {
         sugar: *Sugar,
         inner: dida.core.Node,

@@ -5,8 +5,6 @@ const dida = @import("../dida.zig");
 
 pub const warn = std.debug.warn;
 pub const debug_assert = std.debug.assert;
-pub const max = std.math.max;
-pub const min = std.math.min;
 pub const Allocator = std.mem.Allocator;
 pub const ArenaAllocator = std.heap.ArenaAllocator;
 pub const ArrayList = std.ArrayList;
@@ -18,8 +16,8 @@ pub fn panic(comptime message: []const u8, args: anytype) noreturn {
     var buf = ArrayList(u8).init(std.heap.page_allocator);
     const writer = buf.writer();
     std.fmt.format(writer, message, args) catch
-        std.mem.copy(u8, buf.items[buf.items.len - 3 .. buf.items.len], "OOM");
-    @panic(buf.toOwnedSlice());
+        std.mem.copyForwards(u8, buf.items[buf.items.len - 3 .. buf.items.len], "OOM");
+    @panic(buf.toOwnedSlice() catch unreachable);
 }
 
 pub fn assert(condition: bool, comptime message: []const u8, args: anytype) void {

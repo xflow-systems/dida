@@ -234,12 +234,12 @@ fn testFrontierMove(
     defer actual_frontier_timestamps.deinit();
     var iter = frontier.timestamps.iterator();
     while (iter.next()) |entry| try actual_frontier_timestamps.append(entry.key_ptr.*);
-    std.sort.sort(dida.core.Timestamp, actual_frontier_timestamps.items, {}, struct {
+    std.sort.insertion(dida.core.Timestamp, actual_frontier_timestamps.items, {}, struct {
         fn lessThan(_: void, a: dida.core.Timestamp, b: dida.core.Timestamp) bool {
             return a.lexicalOrder(b) == .lt;
         }
     }.lessThan);
-    std.sort.sort(dida.core.FrontierChange, actual_changes_into.items, {}, struct {
+    std.sort.insertion(dida.core.FrontierChange, actual_changes_into.items, {}, struct {
         fn lessThan(_: void, a: dida.core.FrontierChange, b: dida.core.FrontierChange) bool {
             return dida.util.deepOrder(a, b) == .lt;
         }
@@ -448,12 +448,12 @@ fn testSupportFrontierUpdate(
     defer actual_frontier_timestamps.deinit();
     var iter = frontier.frontier.timestamps.iterator();
     while (iter.next()) |entry| try actual_frontier_timestamps.append(entry.key_ptr.*);
-    std.sort.sort(dida.core.Timestamp, actual_frontier_timestamps.items, {}, struct {
+    std.sort.insertion(dida.core.Timestamp, actual_frontier_timestamps.items, {}, struct {
         fn lessThan(_: void, a: dida.core.Timestamp, b: dida.core.Timestamp) bool {
             return a.lexicalOrder(b) == .lt;
         }
     }.lessThan);
-    std.sort.sort(dida.core.FrontierChange, actual_changes_into.items, {}, struct {
+    std.sort.insertion(dida.core.FrontierChange, actual_changes_into.items, {}, struct {
         fn lessThan(_: void, a: dida.core.FrontierChange, b: dida.core.FrontierChange) bool {
             return dida.util.deepOrder(a, b) == .lt;
         }
@@ -1273,10 +1273,10 @@ pub fn testNodeOutput(shard: *dida.core.Shard, node: dida.core.Node, anon_expect
     const expected_len = expected_change_batches.len;
     const actual_len = actual_change_batches.items.len;
     var i: usize = 0;
-    while (i < std.math.min(expected_len, actual_len) and
+    while (i < @min(expected_len, actual_len) and
         dida.util.deepEqual(expected_change_batches[i].changes, actual_change_batches.items[i].changes))
         i += 1;
-    if (i < std.math.max(expected_len, actual_len)) {
+    if (i < @max(expected_len, actual_len)) {
         dida.util.dump(.{ .expected = expected_change_batches[i..], .actual = actual_change_batches.items[i..] });
         return error.TestExpectedEqual;
     }
@@ -1350,7 +1350,7 @@ test "test shard graph reach" {
                 while (i < count) : (i += 1) {
                     try string.appendSlice(row.values[1].String);
                 }
-                return dida.core.Value{ .String = string.toOwnedSlice() };
+                return dida.core.Value{ .String = string.toOwnedSlice() catch unreachable };
             }
         }).concat,
     };
@@ -1588,7 +1588,7 @@ pub fn testShardTotalBalance() !void {
     while (shard.hasWork()) try shard.doWork();
     try testNodeOutput(&shard, total_balance_out, .{.{.{ .{0}, .{0}, 1 }}});
 
-    var rng = std.rand.DefaultPrng.init(0);
+    var rng = std.Random.DefaultPrng.init(0);
     const random = rng.random();
     var time: usize = 1;
 

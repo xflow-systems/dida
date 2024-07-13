@@ -952,7 +952,7 @@ pub const NodeState = union(enum) {
                 index.pending_changes.deinit();
             },
             .Join => |*join| {
-                for (join.index_input_frontiers) |*frontier| frontier.deinit();
+                for (&join.index_input_frontiers) |*frontier| frontier.deinit();
             },
             .Output => |*output| {
                 for (output.unpopped_change_batches.in.items) |*change_batch| change_batch.deinit(allocator);

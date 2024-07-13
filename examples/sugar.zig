@@ -1,21 +1,12 @@
 // TODO this is just a proof of concept, api might change a lot
 
 const std = @import("std");
-const dida = @import("../lib/dida.zig");
+const dida = @import("lib/dida.zig");
 
-var gpa = std.heap.GeneralPurposeAllocator(.{
-    .safety = true,
-    .never_unmap = true,
-}){};
-var arena = std.heap.ArenaAllocator.init(&gpa.allocator);
-const allocator = &arena.allocator;
+var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+const allocator = arena.allocator();
 
 pub fn main() !void {
-    defer {
-        arena.deinit();
-        _ = gpa.detectLeaks();
-    }
-
     var sugar = dida.sugar.Sugar.init(allocator);
 
     const edges = sugar.input();

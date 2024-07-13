@@ -79,6 +79,8 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("test/core.zig"),
         .target = target,
         .optimize = optimize,
+        .use_lld = false,
+        .use_llvm = false,
     });
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
@@ -90,6 +92,8 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("test/core.zig"),
         .target = target,
         .optimize = optimize,
+        .use_lld = false,
+        .use_llvm = false,
     });
 
     const run_check_unit_tests = b.addRunArtifact(check_unit_tests);

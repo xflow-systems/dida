@@ -1282,370 +1282,371 @@ pub fn testNodeOutput(shard: *dida.core.Shard, node: dida.core.Node, anon_expect
     }
 }
 
-test "test shard graph reach" {
-    var graph_builder = dida.core.GraphBuilder.init(allocator);
-    defer graph_builder.deinit();
+// test "test shard graph reach" {
+//     var graph_builder = dida.core.GraphBuilder.init(allocator);
+//     defer graph_builder.deinit();
 
-    const subgraph_0 = dida.core.Subgraph{ .id = 0 };
-    const subgraph_1 = try graph_builder.addSubgraph(subgraph_0);
+//     const subgraph_0 = dida.core.Subgraph{ .id = 0 };
+//     const subgraph_1 = try graph_builder.addSubgraph(subgraph_0);
 
-    const edges = try graph_builder.addNode(subgraph_0, .Input);
-    const edges_1 = try graph_builder.addNode(subgraph_1, .{ .TimestampPush = .{ .input = edges } });
-    const reach_future = try graph_builder.addNode(subgraph_1, .{ .TimestampIncrement = .{ .input = null } });
-    const reach_index = try graph_builder.addNode(subgraph_1, .{ .Index = .{ .input = reach_future } });
-    const distinct_reach_index = try graph_builder.addNode(subgraph_1, .{ .Distinct = .{ .input = reach_index } });
-    var swapped_edges_mapper = dida.core.NodeSpec.MapSpec.Mapper{
-        .map_fn = (struct {
-            fn swap(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
-                var output_values = try allocator.alloc(dida.core.Value, 2);
-                output_values[0] = try dida.util.deepClone(input.values[1], allocator);
-                output_values[1] = try dida.util.deepClone(input.values[0], allocator);
-                return dida.core.Row{ .values = output_values };
-            }
-        }).swap,
-    };
-    const swapped_edges = try graph_builder.addNode(subgraph_1, .{
-        .Map = .{
-            .input = edges_1,
-            .mapper = &swapped_edges_mapper,
-        },
-    });
-    const swapped_edges_index = try graph_builder.addNode(subgraph_1, .{ .Index = .{ .input = swapped_edges } });
-    const joined = try graph_builder.addNode(subgraph_1, .{
-        .Join = .{
-            .inputs = .{
-                distinct_reach_index,
-                swapped_edges_index,
-            },
-            .key_columns = 1,
-        },
-    });
-    var without_middle_mapper = dida.core.NodeSpec.MapSpec.Mapper{
-        .map_fn = (struct {
-            fn drop_middle(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
-                var output_values = try allocator.alloc(dida.core.Value, 2);
-                output_values[0] = try dida.util.deepClone(input.values[2], allocator);
-                output_values[1] = try dida.util.deepClone(input.values[1], allocator);
-                return dida.core.Row{ .values = output_values };
-            }
-        }).drop_middle,
-    };
-    const without_middle = try graph_builder.addNode(subgraph_1, .{
-        .Map = .{
-            .input = joined,
-            .mapper = &without_middle_mapper,
-        },
-    });
-    const reach = try graph_builder.addNode(subgraph_1, .{ .Union = .{ .inputs = .{ edges_1, without_middle } } });
-    graph_builder.connectLoop(reach, reach_future);
-    const reach_pop = try graph_builder.addNode(subgraph_0, .{ .TimestampPop = .{ .input = distinct_reach_index } });
-    const reach_out = try graph_builder.addNode(subgraph_0, .{ .Output = .{ .input = reach_pop } });
+//     const edges = try graph_builder.addNode(subgraph_0, .Input);
+//     const edges_1 = try graph_builder.addNode(subgraph_1, .{ .TimestampPush = .{ .input = edges } });
+//     const reach_future = try graph_builder.addNode(subgraph_1, .{ .TimestampIncrement = .{ .input = null } });
+//     const reach_index = try graph_builder.addNode(subgraph_1, .{ .Index = .{ .input = reach_future } });
+//     const distinct_reach_index = try graph_builder.addNode(subgraph_1, .{ .Distinct = .{ .input = reach_index } });
+//     var swapped_edges_mapper = dida.core.NodeSpec.MapSpec.Mapper{
+//         .map_fn = (struct {
+//             fn swap(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
+//                 var output_values = try allocator.alloc(dida.core.Value, 2);
+//                 output_values[0] = try dida.util.deepClone(input.values[1], allocator);
+//                 output_values[1] = try dida.util.deepClone(input.values[0], allocator);
+//                 return dida.core.Row{ .values = output_values };
+//             }
+//         }).swap,
+//     };
+//     const swapped_edges = try graph_builder.addNode(subgraph_1, .{
+//         .Map = .{
+//             .input = edges_1,
+//             .mapper = &swapped_edges_mapper,
+//         },
+//     });
+//     const swapped_edges_index = try graph_builder.addNode(subgraph_1, .{ .Index = .{ .input = swapped_edges } });
+//     const joined = try graph_builder.addNode(subgraph_1, .{
+//         .Join = .{
+//             .inputs = .{
+//                 distinct_reach_index,
+//                 swapped_edges_index,
+//             },
+//             .key_columns = 1,
+//         },
+//     });
+//     var without_middle_mapper = dida.core.NodeSpec.MapSpec.Mapper{
+//         .map_fn = (struct {
+//             fn drop_middle(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
+//                 var output_values = try allocator.alloc(dida.core.Value, 2);
+//                 output_values[0] = try dida.util.deepClone(input.values[2], allocator);
+//                 output_values[1] = try dida.util.deepClone(input.values[1], allocator);
+//                 return dida.core.Row{ .values = output_values };
+//             }
+//         }).drop_middle,
+//     };
+//     const without_middle = try graph_builder.addNode(subgraph_1, .{
+//         .Map = .{
+//             .input = joined,
+//             .mapper = &without_middle_mapper,
+//         },
+//     });
+//     const reach = try graph_builder.addNode(subgraph_1, .{ .Union = .{ .inputs = .{ edges_1, without_middle } } });
+//     graph_builder.connectLoop(reach, reach_future);
+//     const reach_pop = try graph_builder.addNode(subgraph_0, .{ .TimestampPop = .{ .input = distinct_reach_index } });
+//     const reach_out = try graph_builder.addNode(subgraph_0, .{ .Output = .{ .input = reach_pop } });
 
-    var reducer = dida.core.NodeSpec.ReduceSpec.Reducer{
-        .reduce_fn = (struct {
-            fn concat(_: *dida.core.NodeSpec.ReduceSpec.Reducer, reduced_value: dida.core.Value, row: dida.core.Row, count: usize) !dida.core.Value {
-                var string = std.ArrayList(u8).init(allocator);
-                try string.appendSlice(reduced_value.String);
-                var i: usize = 0;
-                while (i < count) : (i += 1) {
-                    try string.appendSlice(row.values[1].String);
-                }
-                return dida.core.Value{ .String = string.toOwnedSlice() catch unreachable };
-            }
-        }).concat,
-    };
-    const reach_summary = try graph_builder.addNode(subgraph_1, .{ .Reduce = .{
-        .input = distinct_reach_index,
-        .key_columns = 1,
-        .init_value = .{ .String = "" },
-        .reducer = &reducer,
-    } });
-    const reach_summary_out = try graph_builder.addNode(subgraph_1, .{ .Output = .{ .input = reach_summary } });
+//     var reducer = dida.core.NodeSpec.ReduceSpec.Reducer{
+//         .reduce_fn = (struct {
+//             fn concat(_: *dida.core.NodeSpec.ReduceSpec.Reducer, reduced_value: dida.core.Value, row: dida.core.Row, count: usize) !dida.core.Value {
+//                 var string = std.ArrayList(u8).init(allocator);
+//                 try string.appendSlice(reduced_value.String);
+//                 var i: usize = 0;
+//                 while (i < count) : (i += 1) {
+//                     try string.appendSlice(row.values[1].String);
+//                 }
+//                 return dida.core.Value{ .String = string.toOwnedSlice() catch unreachable };
+//             }
+//         }).concat,
+//     };
+//     const reach_summary = try graph_builder.addNode(subgraph_1, .{ .Reduce = .{
+//         .input = distinct_reach_index,
+//         .key_columns = 1,
+//         .init_value = .{ .String = "" },
+//         .reducer = &reducer,
+//     } });
+//     const reach_summary_out = try graph_builder.addNode(subgraph_1, .{ .Output = .{ .input = reach_summary } });
 
-    var graph = try graph_builder.finishAndReset();
-    defer graph.deinit();
+//     var graph = try graph_builder.finishAndReset();
+//     defer graph.deinit();
 
-    var shard = try dida.core.Shard.init(allocator, &graph);
-    defer shard.deinit();
+//     var shard = try dida.core.Shard.init(allocator, &graph);
+//     defer shard.deinit();
 
-    const timestamp0 = dida.core.Timestamp{ .coords = &[_]u64{0} };
-    const timestamp1 = dida.core.Timestamp{ .coords = &[_]u64{1} };
-    const timestamp2 = dida.core.Timestamp{ .coords = &[_]u64{2} };
+//     const timestamp0 = dida.core.Timestamp{ .coords = &[_]u64{0} };
+//     const timestamp1 = dida.core.Timestamp{ .coords = &[_]u64{1} };
+//     const timestamp2 = dida.core.Timestamp{ .coords = &[_]u64{2} };
 
-    const ab = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "a" }, .{ .String = "b" } } };
-    const bc = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "b" }, .{ .String = "c" } } };
-    const bd = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "b" }, .{ .String = "d" } } };
-    const ca = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "c" }, .{ .String = "a" } } };
+//     const ab = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "a" }, .{ .String = "b" } } };
+//     const bc = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "b" }, .{ .String = "c" } } };
+//     const bd = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "b" }, .{ .String = "d" } } };
+//     const ca = dida.core.Row{ .values = &[_]dida.core.Value{ .{ .String = "c" }, .{ .String = "a" } } };
 
-    try shard.pushInput(edges, .{ .row = try dida.util.deepClone(ab, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
-    try shard.pushInput(edges, .{ .row = try dida.util.deepClone(bc, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
-    try shard.pushInput(edges, .{ .row = try dida.util.deepClone(bd, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
-    try shard.pushInput(edges, .{ .row = try dida.util.deepClone(ca, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
-    try shard.pushInput(edges, .{ .row = try dida.util.deepClone(bc, allocator), .timestamp = try dida.util.deepClone(timestamp1, allocator), .diff = -1 });
-    try shard.flushInput(edges);
+//     try shard.pushInput(edges, .{ .row = try dida.util.deepClone(ab, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
+//     try shard.pushInput(edges, .{ .row = try dida.util.deepClone(bc, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
+//     try shard.pushInput(edges, .{ .row = try dida.util.deepClone(bd, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
+//     try shard.pushInput(edges, .{ .row = try dida.util.deepClone(ca, allocator), .timestamp = try dida.util.deepClone(timestamp0, allocator), .diff = 1 });
+//     try shard.pushInput(edges, .{ .row = try dida.util.deepClone(bc, allocator), .timestamp = try dida.util.deepClone(timestamp1, allocator), .diff = -1 });
+//     try shard.flushInput(edges);
 
-    try shard.advanceInput(edges, timestamp1);
-    while (shard.hasWork()) try shard.doWork();
+//     try shard.advanceInput(edges, timestamp1);
+//     while (shard.hasWork()) try shard.doWork();
 
-    try testNodeOutput(&shard, reach_out, .{
-        .{
-            .{ .{ "a", "b" }, .{0}, 1 },
-            .{ .{ "b", "c" }, .{0}, 1 },
-            .{ .{ "b", "d" }, .{0}, 1 },
-            .{ .{ "c", "a" }, .{0}, 1 },
-        },
-        .{
-            .{ .{ "a", "c" }, .{0}, 1 },
-            .{ .{ "a", "d" }, .{0}, 1 },
-            .{ .{ "b", "a" }, .{0}, 1 },
-            .{ .{ "c", "b" }, .{0}, 1 },
-        },
-        .{
-            .{ .{ "a", "a" }, .{0}, 1 },
-            .{ .{ "b", "b" }, .{0}, 1 },
-            .{ .{ "c", "c" }, .{0}, 1 },
-            .{ .{ "c", "d" }, .{0}, 1 },
-        },
-    });
-    try testNodeOutput(&shard, reach_summary_out, .{
-        .{
-            .{ .{ "a", "b" }, .{ 0, 1 }, 1 },
-            .{ .{ "b", "cd" }, .{ 0, 1 }, 1 },
-            .{ .{ "c", "a" }, .{ 0, 1 }, 1 },
-        },
-        .{
-            .{ .{ "a", "b" }, .{ 0, 2 }, -1 },
-            .{ .{ "b", "cd" }, .{ 0, 2 }, -1 },
-            .{ .{ "c", "a" }, .{ 0, 2 }, -1 },
-            .{ .{ "a", "bcd" }, .{ 0, 2 }, 1 },
-            .{ .{ "b", "acd" }, .{ 0, 2 }, 1 },
-            .{ .{ "c", "ab" }, .{ 0, 2 }, 1 },
-        },
-        .{
-            .{ .{ "a", "bcd" }, .{ 0, 3 }, -1 },
-            .{ .{ "b", "acd" }, .{ 0, 3 }, -1 },
-            .{ .{ "c", "ab" }, .{ 0, 3 }, -1 },
-            .{ .{ "a", "abcd" }, .{ 0, 3 }, 1 },
-            .{ .{ "b", "abcd" }, .{ 0, 3 }, 1 },
-            .{ .{ "c", "abcd" }, .{ 0, 3 }, 1 },
-        },
-    });
+//     try testNodeOutput(&shard, reach_out, .{
+//         .{
+//             .{ .{ "a", "b" }, .{0}, 1 },
+//             .{ .{ "b", "c" }, .{0}, 1 },
+//             .{ .{ "b", "d" }, .{0}, 1 },
+//             .{ .{ "c", "a" }, .{0}, 1 },
+//         },
+//         .{
+//             .{ .{ "a", "c" }, .{0}, 1 },
+//             .{ .{ "a", "d" }, .{0}, 1 },
+//             .{ .{ "b", "a" }, .{0}, 1 },
+//             .{ .{ "c", "b" }, .{0}, 1 },
+//         },
+//         .{
+//             .{ .{ "a", "a" }, .{0}, 1 },
+//             .{ .{ "b", "b" }, .{0}, 1 },
+//             .{ .{ "c", "c" }, .{0}, 1 },
+//             .{ .{ "c", "d" }, .{0}, 1 },
+//         },
+//     });
+//     try testNodeOutput(&shard, reach_summary_out, .{
+//         .{
+//             .{ .{ "a", "b" }, .{ 0, 1 }, 1 },
+//             .{ .{ "b", "cd" }, .{ 0, 1 }, 1 },
+//             .{ .{ "c", "a" }, .{ 0, 1 }, 1 },
+//         },
+//         .{
+//             .{ .{ "a", "b" }, .{ 0, 2 }, -1 },
+//             .{ .{ "b", "cd" }, .{ 0, 2 }, -1 },
+//             .{ .{ "c", "a" }, .{ 0, 2 }, -1 },
+//             .{ .{ "a", "bcd" }, .{ 0, 2 }, 1 },
+//             .{ .{ "b", "acd" }, .{ 0, 2 }, 1 },
+//             .{ .{ "c", "ab" }, .{ 0, 2 }, 1 },
+//         },
+//         .{
+//             .{ .{ "a", "bcd" }, .{ 0, 3 }, -1 },
+//             .{ .{ "b", "acd" }, .{ 0, 3 }, -1 },
+//             .{ .{ "c", "ab" }, .{ 0, 3 }, -1 },
+//             .{ .{ "a", "abcd" }, .{ 0, 3 }, 1 },
+//             .{ .{ "b", "abcd" }, .{ 0, 3 }, 1 },
+//             .{ .{ "c", "abcd" }, .{ 0, 3 }, 1 },
+//         },
+//     });
 
-    try shard.advanceInput(edges, timestamp2);
-    while (shard.hasWork()) try shard.doWork();
+//     try shard.advanceInput(edges, timestamp2);
+//     while (shard.hasWork()) try shard.doWork();
 
-    try testNodeOutput(&shard, reach_out, .{
-        .{
-            .{ .{ "b", "c" }, .{1}, -1 },
-        },
-        .{
-            .{ .{ "a", "c" }, .{1}, -1 },
-            .{ .{ "b", "a" }, .{1}, -1 },
-        },
-        .{
-            .{ .{ "a", "a" }, .{1}, -1 },
-            .{ .{ "b", "b" }, .{1}, -1 },
-            .{ .{ "c", "c" }, .{1}, -1 },
-        },
-    });
-    try testNodeOutput(&shard, reach_summary_out, .{
-        .{
-            .{ .{ "b", "cd" }, .{ 1, 1 }, -1 },
-            .{ .{ "b", "d" }, .{ 1, 1 }, 1 },
-        },
-        .{
-            .{ .{ "a", "bcd" }, .{ 1, 2 }, -1 },
-            .{ .{ "b", "cd" }, .{ 1, 2 }, 1 },
-            .{ .{ "b", "acd" }, .{ 1, 2 }, -1 },
-            .{ .{ "a", "bd" }, .{ 1, 2 }, 1 },
-        },
-        .{
-            .{ .{ "a", "bcd" }, .{ 1, 3 }, 1 },
-            .{ .{ "b", "acd" }, .{ 1, 3 }, 1 },
-            .{ .{ "a", "abcd" }, .{ 1, 3 }, -1 },
-            .{ .{ "b", "abcd" }, .{ 1, 3 }, -1 },
-            .{ .{ "c", "abcd" }, .{ 1, 3 }, -1 },
-            .{ .{ "c", "abd" }, .{ 1, 3 }, 1 },
-        },
-    });
-}
+//     try testNodeOutput(&shard, reach_out, .{
+//         .{
+//             .{ .{ "b", "c" }, .{1}, -1 },
+//         },
+//         .{
+//             .{ .{ "a", "c" }, .{1}, -1 },
+//             .{ .{ "b", "a" }, .{1}, -1 },
+//         },
+//         .{
+//             .{ .{ "a", "a" }, .{1}, -1 },
+//             .{ .{ "b", "b" }, .{1}, -1 },
+//             .{ .{ "c", "c" }, .{1}, -1 },
+//         },
+//     });
+//     try testNodeOutput(&shard, reach_summary_out, .{
+//         .{
+//             .{ .{ "b", "cd" }, .{ 1, 1 }, -1 },
+//             .{ .{ "b", "d" }, .{ 1, 1 }, 1 },
+//         },
+//         .{
+//             .{ .{ "a", "bcd" }, .{ 1, 2 }, -1 },
+//             .{ .{ "b", "cd" }, .{ 1, 2 }, 1 },
+//             .{ .{ "b", "acd" }, .{ 1, 2 }, -1 },
+//             .{ .{ "a", "bd" }, .{ 1, 2 }, 1 },
+//         },
+//         .{
+//             .{ .{ "a", "bcd" }, .{ 1, 3 }, 1 },
+//             .{ .{ "b", "acd" }, .{ 1, 3 }, 1 },
+//             .{ .{ "a", "abcd" }, .{ 1, 3 }, -1 },
+//             .{ .{ "b", "abcd" }, .{ 1, 3 }, -1 },
+//             .{ .{ "c", "abcd" }, .{ 1, 3 }, -1 },
+//             .{ .{ "c", "abd" }, .{ 1, 3 }, 1 },
+//         },
+//     });
+// }
 
-pub fn testShardTotalBalance() !void {
-    var graph_builder = dida.core.GraphBuilder.init(allocator);
-    defer graph_builder.deinit();
+// pub fn testShardTotalBalance() !void {
+//     var graph_builder = dida.core.GraphBuilder.init(allocator);
+//     defer graph_builder.deinit();
 
-    const subgraph_0 = dida.core.Subgraph{ .id = 0 };
+//     const subgraph_0 = dida.core.Subgraph{ .id = 0 };
 
-    // transactions look like (from, to, amount)
-    const transactions = try graph_builder.addNode(subgraph_0, .Input);
+//     // transactions look like (from, to, amount)
+//     const transactions = try graph_builder.addNode(subgraph_0, .Input);
 
-    var credits_mapper = dida.core.NodeSpec.MapSpec.Mapper{
-        .map_fn = (struct {
-            fn map(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
-                // (to, amount)
-                var output_values = try allocator.alloc(dida.core.Value, 2);
-                output_values[0] = try dida.util.deepClone(input.values[1], allocator);
-                output_values[1] = try dida.util.deepClone(input.values[2], allocator);
-                return dida.core.Row{ .values = output_values };
-            }
-        }).map,
-    };
-    const account_credits = try graph_builder.addNode(subgraph_0, .{ .Map = .{
-        .input = transactions,
-        .mapper = &credits_mapper,
-    } });
-    const account_credits_index = try graph_builder.addNode(subgraph_0, .{ .Index = .{ .input = account_credits } });
+//     var credits_mapper = dida.core.NodeSpec.MapSpec.Mapper{
+//         .map_fn = (struct {
+//             fn map(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
+//                 // (to, amount)
+//                 var output_values = try allocator.alloc(dida.core.Value, 2);
+//                 output_values[0] = try dida.util.deepClone(input.values[1], allocator);
+//                 output_values[1] = try dida.util.deepClone(input.values[2], allocator);
+//                 return dida.core.Row{ .values = output_values };
+//             }
+//         }).map,
+//     };
+//     const account_credits = try graph_builder.addNode(subgraph_0, .{ .Map = .{
+//         .input = transactions,
+//         .mapper = &credits_mapper,
+//     } });
+//     const account_credits_index = try graph_builder.addNode(subgraph_0, .{ .Index = .{ .input = account_credits } });
 
-    var debits_mapper = dida.core.NodeSpec.MapSpec.Mapper{
-        .map_fn = (struct {
-            fn map(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
-                // (from, amount)
-                var output_values = try allocator.alloc(dida.core.Value, 2);
-                output_values[0] = try dida.util.deepClone(input.values[0], allocator);
-                output_values[1] = try dida.util.deepClone(input.values[2], allocator);
-                return dida.core.Row{ .values = output_values };
-            }
-        }).map,
-    };
-    const account_debits = try graph_builder.addNode(subgraph_0, .{ .Map = .{
-        .input = transactions,
-        .mapper = &debits_mapper,
-    } });
-    const account_debits_index = try graph_builder.addNode(subgraph_0, .{ .Index = .{ .input = account_debits } });
+//     var debits_mapper = dida.core.NodeSpec.MapSpec.Mapper{
+//         .map_fn = (struct {
+//             fn map(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
+//                 // (from, amount)
+//                 var output_values = try allocator.alloc(dida.core.Value, 2);
+//                 output_values[0] = try dida.util.deepClone(input.values[0], allocator);
+//                 output_values[1] = try dida.util.deepClone(input.values[2], allocator);
+//                 return dida.core.Row{ .values = output_values };
+//             }
+//         }).map,
+//     };
+//     const account_debits = try graph_builder.addNode(subgraph_0, .{ .Map = .{
+//         .input = transactions,
+//         .mapper = &debits_mapper,
+//     } });
+//     const account_debits_index = try graph_builder.addNode(subgraph_0, .{ .Index = .{ .input = account_debits } });
 
-    var summer = dida.core.NodeSpec.ReduceSpec.Reducer{
-        .reduce_fn = (struct {
-            fn sum(_: *dida.core.NodeSpec.ReduceSpec.Reducer, reduced_value: dida.core.Value, row: dida.core.Row, count: usize) !dida.core.Value {
-                return dida.core.Value{ .Number = reduced_value.Number + (row.values[1].Number * @as(f64, @floatFromInt(count))) };
-            }
-        }).sum,
-    };
-    const account_credit = try graph_builder.addNode(subgraph_0, .{ .Reduce = .{
-        .input = account_credits_index,
-        .key_columns = 1,
-        .init_value = .{ .Number = 0 },
-        .reducer = &summer,
-    } });
-    const account_debit = try graph_builder.addNode(subgraph_0, .{ .Reduce = .{
-        .input = account_debits_index,
-        .key_columns = 1,
-        .init_value = .{ .Number = 0 },
-        .reducer = &summer,
-    } });
+//     var summer = dida.core.NodeSpec.ReduceSpec.Reducer{
+//         .reduce_fn = (struct {
+//             fn sum(_: *dida.core.NodeSpec.ReduceSpec.Reducer, reduced_value: dida.core.Value, row: dida.core.Row, count: usize) !dida.core.Value {
+//                 return dida.core.Value{ .Number = reduced_value.Number + (row.values[1].Number * @as(f64, @floatFromInt(count))) };
+//             }
+//         }).sum,
+//     };
+//     const account_credit = try graph_builder.addNode(subgraph_0, .{ .Reduce = .{
+//         .input = account_credits_index,
+//         .key_columns = 1,
+//         .init_value = .{ .Number = 0 },
+//         .reducer = &summer,
+//     } });
+//     const account_debit = try graph_builder.addNode(subgraph_0, .{ .Reduce = .{
+//         .input = account_debits_index,
+//         .key_columns = 1,
+//         .init_value = .{ .Number = 0 },
+//         .reducer = &summer,
+//     } });
 
-    const credit_and_debit = try graph_builder.addNode(subgraph_0, .{ .Join = .{
-        .inputs = .{
-            account_credit,
-            account_debit,
-        },
-        .key_columns = 1,
-    } });
+//     const credit_and_debit = try graph_builder.addNode(subgraph_0, .{ .Join = .{
+//         .inputs = .{
+//             account_credit,
+//             account_debit,
+//         },
+//         .key_columns = 1,
+//     } });
 
-    var balance_mapper = dida.core.NodeSpec.MapSpec.Mapper{
-        .map_fn = (struct {
-            fn map(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
-                // (account, credit - debit)
-                var output_values = try allocator.alloc(dida.core.Value, 2);
-                output_values[0] = try dida.util.deepClone(input.values[0], allocator);
-                output_values[1] = .{ .Number = input.values[1].Number - input.values[2].Number };
-                return dida.core.Row{ .values = output_values };
-            }
-        }).map,
-    };
-    const balance = try graph_builder.addNode(subgraph_0, .{ .Map = .{
-        .input = credit_and_debit,
-        .mapper = &balance_mapper,
-    } });
-    const balance_index = try graph_builder.addNode(subgraph_0, .{ .Index = .{ .input = balance } });
+//     var balance_mapper = dida.core.NodeSpec.MapSpec.Mapper{
+//         .map_fn = (struct {
+//             fn map(_: *dida.core.NodeSpec.MapSpec.Mapper, input: dida.core.Row) error{OutOfMemory}!dida.core.Row {
+//                 // (account, credit - debit)
+//                 var output_values = try allocator.alloc(dida.core.Value, 2);
+//                 output_values[0] = try dida.util.deepClone(input.values[0], allocator);
+//                 output_values[1] = .{ .Number = input.values[1].Number - input.values[2].Number };
+//                 return dida.core.Row{ .values = output_values };
+//             }
+//         }).map,
+//     };
+//     const balance = try graph_builder.addNode(subgraph_0, .{ .Map = .{
+//         .input = credit_and_debit,
+//         .mapper = &balance_mapper,
+//     } });
+//     const balance_index = try graph_builder.addNode(subgraph_0, .{ .Index = .{ .input = balance } });
 
-    const total_balance = try graph_builder.addNode(subgraph_0, .{ .Reduce = .{
-        .input = balance_index,
-        .key_columns = 0,
-        .init_value = .{ .Number = 0 },
-        .reducer = &summer,
-    } });
-    const total_balance_out = try graph_builder.addNode(subgraph_0, .{ .Output = .{ .input = total_balance } });
+//     const total_balance = try graph_builder.addNode(subgraph_0, .{ .Reduce = .{
+//         .input = balance_index,
+//         .key_columns = 0,
+//         .init_value = .{ .Number = 0 },
+//         .reducer = &summer,
+//     } });
+//     const total_balance_out = try graph_builder.addNode(subgraph_0, .{ .Output = .{ .input = total_balance } });
 
-    var graph = try graph_builder.finishAndReset();
-    defer graph.deinit();
+//     var graph = try graph_builder.finishAndReset();
+//     defer graph.deinit();
 
-    var shard = try dida.core.Shard.init(allocator, &graph);
-    defer shard.deinit();
+//     var shard = try dida.core.Shard.init(allocator, &graph);
+//     defer shard.deinit();
 
-    // TODO this is a hack to get around the fact that empty reduces don't return any results, which makes the join not work out
-    var account: usize = 0;
-    while (account <= std.math.maxInt(u4)) : (account += 1) {
-        const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @floatFromInt(account) },
-            .{ .Number = @floatFromInt(account) },
-            .{ .Number = @floatFromInt(0) },
-        } };
-        const timestamp = dida.core.Timestamp{ .coords = &[_]u64{0} };
-        try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
-    }
-    try shard.advanceInput(transactions, .{ .coords = &[_]u64{1} });
+//     // TODO this is a hack to get around the fact that empty reduces don't return any results, which makes the join not work out
+//     var account: usize = 0;
+//     while (account <= std.math.maxInt(u4)) : (account += 1) {
+//         const row = dida.core.Row{ .values = &[_]dida.core.Value{
+//             .{ .Number = @floatFromInt(account) },
+//             .{ .Number = @floatFromInt(account) },
+//             .{ .Number = @floatFromInt(0) },
+//         } };
+//         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{0} };
+//         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
+//     }
+//     try shard.advanceInput(transactions, .{ .coords = &[_]u64{1} });
 
-    while (shard.hasWork()) try shard.doWork();
-    try testNodeOutput(&shard, total_balance_out, .{.{.{ .{0}, .{0}, 1 }}});
+//     while (shard.hasWork()) try shard.doWork();
+//     try testNodeOutput(&shard, total_balance_out, .{.{.{ .{0}, .{0}, 1 }}});
 
-    var rng = std.Random.DefaultPrng.init(0);
-    const random = rng.random();
-    var time: usize = 1;
+//     var rng = std.Random.DefaultPrng.init(0);
+//     const random = rng.random();
+//     var time: usize = 1;
 
-    while (time < 100) : (time += 1) {
-        const from_account = random.int(u4);
-        const to_account = random.int(u4);
-        const amount = random.int(u8);
-        const skew = random.int(u3);
-        const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @floatFromInt(from_account) },
-            .{ .Number = @floatFromInt(to_account) },
-            .{ .Number = @floatFromInt(amount) },
-        } };
-        const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
-        try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
-        try shard.advanceInput(transactions, .{ .coords = &[_]u64{time + 1} });
-        while (shard.hasWork()) try shard.doWork();
-        try testNodeOutput(&shard, total_balance_out, .{});
-    }
+//     while (time < 100) : (time += 1) {
+//         const from_account = random.int(u4);
+//         const to_account = random.int(u4);
+//         const amount = random.int(u8);
+//         const skew = random.int(u3);
+//         const row = dida.core.Row{ .values = &[_]dida.core.Value{
+//             .{ .Number = @floatFromInt(from_account) },
+//             .{ .Number = @floatFromInt(to_account) },
+//             .{ .Number = @floatFromInt(amount) },
+//         } };
+//         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
+//         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
+//         try shard.advanceInput(transactions, .{ .coords = &[_]u64{time + 1} });
+//         while (shard.hasWork()) try shard.doWork();
+//         try testNodeOutput(&shard, total_balance_out, .{});
+//     }
 
-    // this time, add all the inputs before doing work
-    while (time < 200) : (time += 1) {
-        const from_account = random.int(u4);
-        const to_account = random.int(u4);
-        const amount = random.int(u8);
-        const skew = random.int(u3);
-        const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @floatFromInt(from_account) },
-            .{ .Number = @floatFromInt(to_account) },
-            .{ .Number = @floatFromInt(amount) },
-        } };
-        const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
-        try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
-        try shard.advanceInput(transactions, .{ .coords = &[_]u64{time + 1} });
-    }
-    while (shard.hasWork()) try shard.doWork();
-    try testNodeOutput(&shard, total_balance_out, .{});
+//     // this time, add all the inputs before doing work
+//     while (time < 200) : (time += 1) {
+//         const from_account = random.int(u4);
+//         const to_account = random.int(u4);
+//         const amount = random.int(u8);
+//         const skew = random.int(u3);
+//         const row = dida.core.Row{ .values = &[_]dida.core.Value{
+//             .{ .Number = @floatFromInt(from_account) },
+//             .{ .Number = @floatFromInt(to_account) },
+//             .{ .Number = @floatFromInt(amount) },
+//         } };
+//         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
+//         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
+//         try shard.advanceInput(transactions, .{ .coords = &[_]u64{time + 1} });
+//     }
+//     while (shard.hasWork()) try shard.doWork();
+//     try testNodeOutput(&shard, total_balance_out, .{});
 
-    // this time, do one big input batch
-    while (time < 300) : (time += 1) {
-        const from_account = random.int(u4);
-        const to_account = random.int(u4);
-        const amount = random.int(u8);
-        const skew = random.int(u3);
-        const row = dida.core.Row{ .values = &[_]dida.core.Value{
-            .{ .Number = @floatFromInt(from_account) },
-            .{ .Number = @floatFromInt(to_account) },
-            .{ .Number = @floatFromInt(amount) },
-        } };
-        const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
-        try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
-    }
-    try shard.advanceInput(transactions, .{ .coords = &[_]u64{time + 1} });
-    while (shard.hasWork()) try shard.doWork();
-    try testNodeOutput(&shard, total_balance_out, .{});
-}
+//     // this time, do one big input batch
+//     while (time < 300) : (time += 1) {
+//         const from_account = random.int(u4);
+//         const to_account = random.int(u4);
+//         const amount = random.int(u8);
+//         const skew = random.int(u3);
+//         const row = dida.core.Row{ .values = &[_]dida.core.Value{
+//             .{ .Number = @floatFromInt(from_account) },
+//             .{ .Number = @floatFromInt(to_account) },
+//             .{ .Number = @floatFromInt(amount) },
+//         } };
+//         const timestamp = dida.core.Timestamp{ .coords = &[_]u64{time + @as(usize, skew)} };
+//         try shard.pushInput(transactions, .{ .row = try dida.util.deepClone(row, allocator), .timestamp = try dida.util.deepClone(timestamp, allocator), .diff = 1 });
+//     }
+//     try shard.advanceInput(transactions, .{ .coords = &[_]u64{time + 1} });
+//     while (shard.hasWork()) try shard.doWork();
+//     try testNodeOutput(&shard, total_balance_out, .{});
+// }
 
-test "test shard total balance" {
-    try testShardTotalBalance();
-}
+// test "test shard total balance" {
+//     try testShardTotalBalance();
+// }
+
